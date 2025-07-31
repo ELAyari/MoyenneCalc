@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moyenne Calculator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="popup-container">
+        <div class="header">
+            <img src="icon.png" alt="Calculator" class="icon">
+            <h1>Calculator</h1>
+            <p class="subtitle">Par Nasri Ayari</p>
+        </div>
+        
+        <div class="content">
+            <div class="status-section">
+                <h3>État du Calcul</h3>
+                <div id="status-indicator" class="status-indicator">
+                    <span class="status-text">Vérification...</span>
+                    <div class="status-dot"></div>
+                </div>
+            </div>
+            
+            <div class="actions-section">
+                <h3>Actions Disponibles</h3>
+                
+                <button id="calculate-btn" class="action-btn primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 12l2 2 4-4"/>
+                        <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"/>
+                        <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"/>
+                    </svg>
+                    Calculer les Notes
+                </button>
+                
+                <button id="export-btn" class="action-btn secondary" disabled>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7,10 12,15 17,10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Exporter (JSON)
+                </button>
+            </div>
+            
+            <div class="info-section">
+                <h3>Instructions</h3>
+                <ol class="instructions">
+                    <li>Accédez à votre page de notes Esprit</li>
+                    <li>Cliquez sur "Calculer les Notes"</li>
+                    <li>Modifiez les notes si nécessaire</li>
+                    <li>Exportez vos résultats</li>
+                </ol>
+            </div>
+            
+            <div class="features-section">
+                <h3>Fonctionnalités</h3>
+                <ul class="features">
+                    <li>✅ Calcul automatique des moyennes</li>
+                    <li>✅ Groupement par UE</li>
+                    <li>✅ Notes modifiables en temps réel</li>
+                    <li>✅ Export CSV/JSON</li>
+                    <li>✅ Impression des résultats</li>
+                    <li>✅ Validation automatique</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p class="version">Version 2.0</p>
+            <p class="credits">Développé par Nasri Ayari</p>
+        </div>
+    </div>
+    
+    <script src="popup.js"></script>
+</body>
+</html>
