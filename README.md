@@ -51,7 +51,7 @@ A comprehensive Chrome extension designed for **Esprit Cours du Soir** students 
 ### Method 1: Load Unpacked Extension
 
 1. **Download the Extension**:
-   - Clone this repository: `git clone https://github.com/your-repo/esprit-grade-calculator.git`
+   - Clone this repository: `git clone https://github.com/ELAyari/MoyenneCalc.git`
    - Or download and extract the ZIP file
 
 2. **Load in Chrome**:
