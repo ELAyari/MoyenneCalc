@@ -735,17 +735,13 @@ class EspritGradeCalculator {
     container.innerHTML = `
       <h4>Exporter les résultats</h4>
       <div class="export-buttons">
-        <button id="export-csv" class="export-btn">📊 Exporter CSV</button>
         <button id="export-json" class="export-btn">📄 Exporter JSON</button>
-        <button id="export-pdf" class="export-btn">📋 Exporter PDF</button>
         <button id="print-results" class="export-btn">🖨️ Imprimer</button>
       </div>
     `;
     
     // Add event listeners
-    container.querySelector('#export-csv').addEventListener('click', () => this.exportToCSV());
     container.querySelector('#export-json').addEventListener('click', () => this.exportToJSON());
-    container.querySelector('#export-pdf').addEventListener('click', () => this.exportToPDF());
     container.querySelector('#print-results').addEventListener('click', () => this.printResults());
     
     return container;
