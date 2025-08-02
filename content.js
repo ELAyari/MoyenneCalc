@@ -6,65 +6,9 @@ class EspritGradeCalculator {
     this.groupedData = {};
     this.isCalculated = false;
     this.originalTable = null;
-    
-    // UE Groups with proper module mapping and credits
-    this.ueGroups = {
-      "Algorithmique et résolution de problèmes": {
-        modules: [
-          { name: "Algorithmique et structure de données", credits: 3 },
-          { name: "Analyse numérique", credits: 2 }
-        ],
-        totalCredits: 5
-      },
-      "Modélisation et Programmation par Objet": {
-        modules: [
-          { name: "Conception par Objet et Programmation Java", credits: 4 },
-          { name: "Outil collaboratif GIT", credits: 1 },
-          { name: "Langage de modélisation (UML)", credits: 3 }
-        ],
-        totalCredits: 8
-      },
-      "Communication, Culture et Citoyenneté F1_Professionnel": {
-        modules: [
-          { name: "Communication, Culture et Citoyenneté F1_PR", credits: 2 }
-        ],
-        totalCredits: 2
-      },
-      "Communication, Culture et Citoyenneté A1_Professionnel": {
-        modules: [
-          { name: "Communication, Culture et Citoyenneté A1_PR", credits: 2 }
-        ],
-        totalCredits: 2
-      },
-      "Développement Web": {
-        modules: [
-          { name: "Technologies Web 2.0", credits: 3 },
-          { name: "Application coté client Angular-1", credits: 2 },
-          { name: "Java scripts coté serveur", credits: 2 }
-        ],
-        totalCredits: 7
-      },
-      "Fondements des TIC": {
-        modules: [
-          { name: "Bases de Données", credits: 2 },
-          { name: "Sys. De Gestion de Bases de Données", credits: 3, aliases: ["SGBD", "Système de Gestion de Bases de Données", "Gestion de Bases de Données"] }
-        ],
-        totalCredits: 5
-      },
-      "Fondements système et réseaux": {
-        modules: [
-          { name: "Système et scripting", credits: 2 },
-          { name: "Fondements des Réseaux", credits: 3 }
-        ],
-        totalCredits: 5
-      },
-      "Projet d'intégration": {
-        modules: [
-          { name: "Projet d'Intégration Java/Mobile", credits: 6 }
-        ],
-        totalCredits: 6
-      }
-    };
+
+    // User-defined UE groups, initially empty for dynamic configuration
+    this.ueGroups = {};
 
     // Default note coefficients for different evaluation types
     this.defaultNoteCoefs = {
@@ -76,6 +20,8 @@ class EspritGradeCalculator {
 
     this.init();
   }
+
+
 
   init() {
     // Listen for messages from background script
@@ -105,10 +51,10 @@ class EspritGradeCalculator {
 
       this.originalTable = table;
       this.currentData = this.parseTable(table);
-      
+
       // Check for rattrapage grades in GridView2
       this.handleRattrapageGrades();
-      
+
       if (this.currentData.length === 0) {
         this.showNotification("Aucune donnée de note trouvée", "warning");
         return;
@@ -116,16 +62,16 @@ class EspritGradeCalculator {
 
       // Calculate individual averages
       this.calculateIndividualAverages();
-      
+
       // Group modules by UE and calculate group averages
       this.groupModulesByUE();
-      
+
       // Create enhanced tables
       this.createEnhancedTables();
-      
+
       this.isCalculated = true;
       this.showNotification("Calculs terminés avec succès! - Calculator by Nasri Ayari", "success");
-      
+
     } catch (error) {
       console.error("Error calculating grades:", error);
       this.showNotification("Erreur lors du calcul des notes: " + error.message, "error");
@@ -143,7 +89,7 @@ class EspritGradeCalculator {
 
       const designation = cells[0]?.textContent.trim();
       const enseignant = cells[1]?.textContent.trim();
-      
+
       // Parse grades with European decimal format support
       const noteCC = this.parseGrade(cells[2]?.textContent.trim());
       const noteTP = this.parseGrade(cells[3]?.textContent.trim());
@@ -252,56 +198,18 @@ class EspritGradeCalculator {
     // Normalize spaces and trim
     const normalizedModuleName = moduleName.replace(/\s+/g, ' ').trim();
     const lowerName = normalizedModuleName.toLowerCase();
-    
-    // Special case: If module name contains "gestion", it's SGBD (3 credits)
-    if (lowerName.includes("gestion")) {
-      console.log(`Found "Gestion" keyword: ${normalizedModuleName} -> SGBD (3 credits)`);
-      return 3;
-    }
-    
-    // First pass: Check for exact name matches
+
+    // Search in user-defined ueGroups
     for (const ueGroup of Object.values(this.ueGroups)) {
       for (const module of ueGroup.modules) {
         if (lowerName === module.name.toLowerCase()) {
-          console.log(`Found exact match: ${normalizedModuleName} -> ${module.name} (${module.credits} credits)`);
           return module.credits;
         }
       }
     }
-    
-    // Second pass: Check for alias matches
-    for (const ueGroup of Object.values(this.ueGroups)) {
-      for (const module of ueGroup.modules) {
-        if (module.aliases) {
-          for (const alias of module.aliases) {
-            if (lowerName === alias.toLowerCase() || 
-                lowerName.includes(alias.toLowerCase()) || 
-                alias.toLowerCase().includes(lowerName)) {
-              console.log(`Found alias match: ${normalizedModuleName} -> ${module.name} (${module.credits} credits)`);
-              return module.credits;
-            }
-          }
-        }
-      }
-    }
-    
-    // Third pass: Check for partial matches (but exclude modules with aliases to prevent conflicts)
-    for (const ueGroup of Object.values(this.ueGroups)) {
-      for (const module of ueGroup.modules) {
-        if (!module.aliases && (lowerName.includes(module.name.toLowerCase()) || module.name.toLowerCase().includes(lowerName))) {
-          console.log(`Found partial match: ${normalizedModuleName} -> ${module.name} (${module.credits} credits)`);
-          return module.credits;
-        }
-      }
-    }
-    
-    // Additional debug: log communication module names checked in isModuleMatch
-    if (lowerName.includes("communication")) {
-      console.log(`Communication module not matched: ${normalizedModuleName}`);
-    }
-    
-    console.log(`No match found for module: ${normalizedModuleName}, using default 1 credit`);
-    return 1; // Default credit value
+
+    // Default credit if not found
+    return 1;
   }
 
   // Check if module names match (with partial matching and aliases)
@@ -382,23 +290,33 @@ class EspritGradeCalculator {
     return matrix[str2.length][str1.length];
   }
 
-  // Calculate individual module averages
+  // Calculate individual module averages and update general average
   calculateIndividualAverages() {
     let totalWeightedScore = 0;
     let totalCredits = 0;
 
+    // Only calculate for non-general modules
     this.currentData.forEach(module => {
-      module.moyenne = this.calculateModuleAverage(module);
-      
-      if (module.moyenne !== null) {
-        totalWeightedScore += module.moyenne * module.credits;
-        totalCredits += module.credits;
+      if (!module.isGeneral) {
+        module.moyenne = this.calculateModuleAverage(module);
+        
+        if (module.moyenne !== null) {
+          totalWeightedScore += module.moyenne * module.credits;
+          totalCredits += module.credits;
+        }
       }
     });
 
-    // Add general average
+    // Update or add general average
+    this.updateGeneralAverage(totalWeightedScore, totalCredits);
+  }
+
+  // Update general average with new values
+  updateGeneralAverage(totalWeightedScore, totalCredits) {
     const generalAverage = totalCredits > 0 ? totalWeightedScore / totalCredits : 0;
-    this.currentData.push({
+    
+    const existingGeneralIndex = this.currentData.findIndex(m => m.isGeneral);
+    const generalModule = {
       designation: "Moyenne Générale Individuelle",
       enseignant: "",
       noteCC: null,
@@ -406,8 +324,15 @@ class EspritGradeCalculator {
       noteExam: null,
       credits: totalCredits,
       moyenne: generalAverage,
-      isGeneral: true
-    });
+      isGeneral: true,
+      hasRattrapage: false
+    };
+
+    if (existingGeneralIndex !== -1) {
+      this.currentData[existingGeneralIndex] = generalModule;
+    } else {
+      this.currentData.push(generalModule);
+    }
   }
 
   // Calculate average for a single module
@@ -435,44 +360,60 @@ class EspritGradeCalculator {
     }
   }
 
-  // Group modules by UE and calculate group averages
+  // Group modules dynamically - creates UE groups from drag-and-drop interface or defaults to individual groups
   groupModulesByUE() {
     this.groupedData = {};
 
-    // Initialize UE groups
-    Object.entries(this.ueGroups).forEach(([ueName, ueInfo]) => {
-      this.groupedData[ueName] = {
-        name: ueName,
-        modules: [],
-        totalCredits: ueInfo.totalCredits,
-        weightedScore: 0,
-        moyenne: 0
-      };
-    });
+    // If UE groups are configured via drag-and-drop interface
+    if (Object.keys(this.ueGroups).length > 0) {
+      // Initialize configured UE groups
+      Object.entries(this.ueGroups).forEach(([ueName, ueInfo]) => {
+        this.groupedData[ueName] = {
+          name: ueName,
+          modules: [],
+          totalCredits: ueInfo.totalCredits || 0,
+          weightedScore: 0,
+          moyenne: 0
+        };
+      });
 
-    // Assign modules to UE groups
-    this.currentData.forEach(module => {
-      if (module.isGeneral) return;
-      
-      let assigned = false;
-      
-      for (const [ueName, ueInfo] of Object.entries(this.ueGroups)) {
-        for (const ueModule of ueInfo.modules) {
-          if (this.isModuleMatch(module.designation.toLowerCase(), ueModule.name.toLowerCase(), ueModule.aliases || [])) {
+      // Assign modules to configured UE groups
+      this.currentData.forEach(module => {
+        if (module.isGeneral) return;
+
+        let assigned = false;
+
+        for (const [ueName, ueInfo] of Object.entries(this.ueGroups)) {
+          if (ueInfo.modules && ueInfo.modules.some(ueModule => 
+            this.isModuleMatch(module.designation.toLowerCase(), ueModule.name.toLowerCase(), ueModule.aliases || []))) {
             this.groupedData[ueName].modules.push(module);
             if (module.moyenne !== null) {
               this.groupedData[ueName].weightedScore += module.moyenne * module.credits;
             }
+            this.groupedData[ueName].totalCredits = this.groupedData[ueName].modules.reduce((sum, m) => sum + m.credits, 0);
             assigned = true;
             break;
           }
         }
-        if (assigned) break;
-      }
-      
-      // If not assigned to any UE, create individual group
-      if (!assigned) {
-        const groupName = `Non-classé: ${module.designation}`;
+
+        // If not assigned to any configured UE, create individual group
+        if (!assigned) {
+          const groupName = module.designation;
+          this.groupedData[groupName] = {
+            name: groupName,
+            modules: [module],
+            totalCredits: module.credits,
+            weightedScore: module.moyenne !== null ? module.moyenne * module.credits : 0,
+            moyenne: module.moyenne || 0
+          };
+        }
+      });
+    } else {
+      // Default: Create individual groups for each module (fully generic approach)
+      this.currentData.forEach(module => {
+        if (module.isGeneral) return;
+
+        const groupName = module.designation;
         this.groupedData[groupName] = {
           name: groupName,
           modules: [module],
@@ -480,36 +421,46 @@ class EspritGradeCalculator {
           weightedScore: module.moyenne !== null ? module.moyenne * module.credits : 0,
           moyenne: module.moyenne || 0
         };
-      }
-    });
+      });
+    }
 
-    // Calculate UE averages
+    // Calculate UE averages with updated credits
     let totalUEScore = 0;
     let totalUECredits = 0;
 
     Object.values(this.groupedData).forEach(ue => {
       if (ue.modules.length > 0) {
-        const validModules = ue.modules.filter(m => m.moyenne !== null);
-        const validCredits = validModules.reduce((sum, m) => sum + m.credits, 0);
+        // Recalculate weighted score with current credits
+        ue.weightedScore = 0;
+        ue.totalCredits = 0;
         
-        if (validCredits > 0) {
-          ue.moyenne = ue.weightedScore / validCredits;
+        ue.modules.forEach(module => {
+          if (module.moyenne !== null) {
+            ue.weightedScore += module.moyenne * module.credits;
+          }
+          ue.totalCredits += module.credits;
+        });
+
+        if (ue.totalCredits > 0) {
+          ue.moyenne = ue.weightedScore / ue.totalCredits;
           totalUEScore += ue.moyenne * ue.totalCredits;
           totalUECredits += ue.totalCredits;
         }
       }
     });
 
-    // Add general UE average
-    const generalUEAverage = totalUECredits > 0 ? totalUEScore / totalUECredits : 0;
-    this.groupedData["Moyenne Générale UE"] = {
-      name: "Moyenne Générale UE",
-      modules: [],
-      totalCredits: totalUECredits,
-      weightedScore: totalUEScore,
-      moyenne: generalUEAverage,
-      isGeneral: true
-    };
+    // Only add general UE average if there are configured UE groups
+    if (Object.keys(this.ueGroups).length > 0 && totalUECredits > 0) {
+      const generalUEAverage = totalUEScore / totalUECredits;
+      this.groupedData["Moyenne Générale UE"] = {
+        name: "Moyenne Générale UE",
+        modules: [],
+        totalCredits: totalUECredits,
+        weightedScore: totalUEScore,
+        moyenne: generalUEAverage,
+        isGeneral: true
+      };
+    }
   }
 
   // Create enhanced tables with both individual and grouped views
@@ -534,8 +485,25 @@ class EspritGradeCalculator {
     const exportContainer = this.createExportControls();
     mainContainer.appendChild(exportContainer);
     
-    // Insert after original table
+
+    
+    // Replace the original table with enhanced tables
+    this.originalTable.style.display = 'none';
     this.originalTable.parentNode.insertBefore(mainContainer, this.originalTable.nextSibling);
+    
+    // Check for Projet d'Intégration modules and notify user
+    const projetIntegrationModules = this.currentData.filter(module => 
+      this.isProjetIntegrationModule(module.designation)
+    );
+    
+    if (projetIntegrationModules.length > 0) {
+      const moduleNames = projetIntegrationModules.map(m => m.designation).join(', ');
+      this.showNotification(
+        `⚠️ Modules Projet d'Intégration détectés: ${moduleNames}. Validation requise: ≥10/20 (au lieu de ≥8/20)`, 
+        "info", 
+        8000
+      );
+    }
   }
 
   // Create individual modules table
@@ -586,8 +554,16 @@ class EspritGradeCalculator {
     const row = document.createElement('tr');
     row.className = module.isGeneral ? 'general-row' : 'module-row';
     
+    // Add special styling for Projet d'Intégration modules
+    const isProjetIntegration = this.isProjetIntegrationModule(module.designation);
+    if (isProjetIntegration) {
+      row.classList.add('projet-integration-row');
+    }
+    
     if (module.moyenne !== null) {
-      row.classList.add(module.moyenne >= 8 ? 'passing' : 'failing');
+      // Special validation for Projet d'Intégration modules - requires 10+ instead of 8+
+      const passingGrade = isProjetIntegration ? 10 : 8;
+      row.classList.add(module.moyenne >= passingGrade ? 'passing' : 'failing');
     }
     
     // Add rattrapage indicator if applicable
@@ -615,7 +591,9 @@ class EspritGradeCalculator {
       <td>
         ${module.isGeneral ? '-' : `<input type="text" class="grade-input exam-input ${module.hasRattrapage ? 'rattrapage-input' : ''}" value="${examValue}" data-index="${index}" data-type="exam" title="${module.hasRattrapage ? 'Note de rattrapage' : 'Note d\'examen'}">`}
       </td>
-      <td>${module.credits}</td>
+      <td>
+        ${module.isGeneral ? module.credits : `<input type="number" class="credits-input" value="${module.credits}" data-index="${index}" min="1" max="20" title="Crédits modifiables">`}
+      </td>
       <td class="moyenne-cell">${moyenneValue}</td>
       <td>
         ${module.isGeneral ? '' : `<button class="recalculate-btn" data-index="${index}">Recalculer</button>`}
@@ -629,6 +607,13 @@ class EspritGradeCalculator {
         input.addEventListener('input', (e) => this.handleGradeInput(e));
         input.addEventListener('blur', (e) => this.validateGradeInput(e));
       });
+      
+      // Add credits input event listener
+      const creditsInput = row.querySelector('.credits-input');
+      if (creditsInput) {
+        creditsInput.addEventListener('input', (e) => this.handleCreditsChange(e));
+        creditsInput.addEventListener('blur', (e) => this.validateCreditsInput(e));
+      }
       
       const recalculateBtn = row.querySelector('.recalculate-btn');
       if (recalculateBtn) {
@@ -678,26 +663,66 @@ class EspritGradeCalculator {
     return container;
   }
 
-  // Create grouped UE row
+  // Create grouped UE row with drag-and-drop functionality
   createGroupedRow(ue) {
     const row = document.createElement('tr');
-    row.className = ue.isGeneral ? 'general-row' : 'ue-row';
+    row.className = ue.isGeneral ? 'general-row' : 'ue-row draggable-row';
+    
+    // Check if this UE contains Projet d'Intégration modules
+    const isProjetIntegration = this.isProjetIntegrationModule(ue.name) || 
+                               ue.modules.some(m => this.isProjetIntegrationModule(m.designation));
+    
+    if (isProjetIntegration) {
+      row.classList.add('projet-integration-row');
+    }
     
     if (ue.moyenne !== null && !ue.isGeneral) {
-      row.classList.add(ue.moyenne >= 8 ? 'passing' : 'failing');
+      // Special validation for Projet d'Intégration modules - requires 10+ instead of 8+
+      const passingGrade = isProjetIntegration ? 10 : 8;
+      row.classList.add(ue.moyenne >= passingGrade ? 'passing' : 'failing');
+    }
+    
+    // Make non-general rows draggable
+    if (!ue.isGeneral) {
+      row.draggable = true;
+      row.dataset.ueName = ue.name;
+      
+      // Add drag event listeners
+      row.addEventListener('dragstart', (e) => this.handleDragStart(e));
+      row.addEventListener('dragover', (e) => this.handleDragOver(e));
+      row.addEventListener('drop', (e) => this.handleDrop(e));
+      row.addEventListener('dragend', (e) => this.handleDragEnd(e));
     }
     
     const modulesList = ue.modules.map(m => m.designation).join(', ') || '-';
     const moyenneValue = ue.moyenne.toFixed(2).replace('.', ',');
-    const status = ue.isGeneral ? '' : (ue.moyenne >= 8 ? 'Validé' : 'Non validé');
+    
+    // Use the already declared isProjetIntegration variable
+    const passingGrade = isProjetIntegration ? 10 : 8;
+    const status = ue.isGeneral ? '' : (ue.moyenne >= passingGrade ? 'Validé' : 'Non validé');
     
     row.innerHTML = `
-      <td class="ue-name">${ue.name}</td>
+      <td class="ue-name">
+        ${!ue.isGeneral ? '<span class="drag-handle">⋮⋮</span>' : ''} 
+        ${ue.name}
+        ${!ue.isGeneral ? '<button class="split-ue-btn" title="Séparer cette UE">✂️</button>' : ''}
+      </td>
       <td class="modules-list" title="${modulesList}">${modulesList}</td>
-      <td>${ue.totalCredits}</td>
+      <td class="credits-cell">${ue.totalCredits}</td>
       <td class="moyenne-cell">${moyenneValue}</td>
       <td class="status-cell">${status}</td>
     `;
+    
+    // Add split UE functionality
+    if (!ue.isGeneral) {
+      const splitBtn = row.querySelector('.split-ue-btn');
+      if (splitBtn) {
+        splitBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.splitUE(ue.name);
+        });
+      }
+    }
     
     return row;
   }
@@ -710,15 +735,17 @@ class EspritGradeCalculator {
     container.innerHTML = `
       <h4>Exporter les résultats</h4>
       <div class="export-buttons">
-        <button id="export-csv" class="export-btn">Exporter CSV</button>
-        <button id="export-json" class="export-btn">Exporter JSON</button>
-        <button id="print-results" class="export-btn">Imprimer</button>
+        <button id="export-csv" class="export-btn">📊 Exporter CSV</button>
+        <button id="export-json" class="export-btn">📄 Exporter JSON</button>
+        <button id="export-pdf" class="export-btn">📋 Exporter PDF</button>
+        <button id="print-results" class="export-btn">🖨️ Imprimer</button>
       </div>
     `;
     
     // Add event listeners
     container.querySelector('#export-csv').addEventListener('click', () => this.exportToCSV());
     container.querySelector('#export-json').addEventListener('click', () => this.exportToJSON());
+    container.querySelector('#export-pdf').addEventListener('click', () => this.exportToPDF());
     container.querySelector('#print-results').addEventListener('click', () => this.printResults());
     
     return container;
@@ -834,7 +861,8 @@ class EspritGradeCalculator {
         
         individualRows[index].classList.remove('passing', 'failing');
         if (module.moyenne !== null && !module.isGeneral) {
-          individualRows[index].classList.add(module.moyenne >= 8 ? 'passing' : 'failing');
+          const passingGrade = this.isProjetIntegrationModule(module.designation) ? 10 : 8;
+          individualRows[index].classList.add(module.moyenne >= passingGrade ? 'passing' : 'failing');
         }
       }
     });
@@ -851,9 +879,12 @@ class EspritGradeCalculator {
         moyenneCell.textContent = moyenneValue;
         
         if (statusCell && !ue.isGeneral) {
-          statusCell.textContent = ue.moyenne >= 8 ? 'Validé' : 'Non validé';
+          const isProjetIntegration = this.isProjetIntegrationModule(ue.name) || 
+                                     ue.modules.some(m => this.isProjetIntegrationModule(m.designation));
+          const passingGrade = isProjetIntegration ? 10 : 8;
+          statusCell.textContent = ue.moyenne >= passingGrade ? 'Validé' : 'Non validé';
           groupedRows[index].classList.remove('passing', 'failing');
-          groupedRows[index].classList.add(ue.moyenne >= 8 ? 'passing' : 'failing');
+          groupedRows[index].classList.add(ue.moyenne >= passingGrade ? 'passing' : 'failing');
         }
       }
     });
@@ -926,7 +957,7 @@ class EspritGradeCalculator {
     printWindow.document.write(`
       <html>
         <head>
-          <title>Notes Esprit - ${new Date().toLocaleDateString()}</title>
+          <title>Calculator - Notes Esprit - ${new Date().toLocaleDateString()}</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 20px; }
             table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
@@ -947,6 +978,313 @@ class EspritGradeCalculator {
     `);
     
     printWindow.document.close();
+  }
+
+  // Export to PDF with professional template
+  async exportToPDF() {
+    try {
+      // Load jsPDF library if not already loaded
+      if (typeof window.jsPDF === 'undefined') {
+        await this.loadJsPDF();
+      }
+
+      const { jsPDF } = window.jsPDF;
+      const doc = new jsPDF('p', 'mm', 'a4');
+      
+      // Generate PDF content
+      this.generatePDFContent(doc);
+      
+      // Save the PDF
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `Calculator_Notes_Esprit_${timestamp}_NasriAyari.pdf`;
+      doc.save(filename);
+      
+      this.showNotification(`PDF exporté: ${filename} - Calculator by Nasri Ayari`, "success");
+      
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      this.showNotification("Erreur lors de l'export PDF: " + error.message, "error");
+    }
+  }
+
+  // Load jsPDF library dynamically
+  async loadJsPDF() {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Failed to load jsPDF library'));
+      document.head.appendChild(script);
+    });
+  }
+
+  // Generate PDF content with professional template
+  generatePDFContent(doc) {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    let yPosition = 20;
+
+    // Header with professional design
+    doc.setFillColor(102, 126, 234); // Purple gradient start color
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    // Title
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('📊 Calculator - Relevé de Notes', pageWidth / 2, 20, { align: 'center' });
+    
+    // Subtitle
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('École Supérieure Privée d\'Ingénierie et de Technologies (ESPRIT)', pageWidth / 2, 30, { align: 'center' });
+    
+    yPosition = 50;
+
+    // Document info section
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    const currentDate = new Date().toLocaleDateString('fr-FR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    
+    doc.text(`📅 Date d'export: ${currentDate}`, 20, yPosition);
+    doc.text(`👨‍💻 Développé par: Nasri Ayari`, 20, yPosition + 5);
+    doc.text(`🔧 Version: Calculator 2.0`, 20, yPosition + 10);
+    
+    yPosition += 25;
+
+    // Individual modules section
+    doc.setFillColor(248, 249, 250);
+    doc.rect(15, yPosition - 5, pageWidth - 30, 8, 'F');
+    
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(51, 51, 51);
+    doc.text('📚 Détail des Modules Individuels', 20, yPosition);
+    yPosition += 15;
+
+    // Individual modules table
+    const individualTableData = this.prepareIndividualTableData();
+    yPosition = this.drawPDFTable(doc, individualTableData.headers, individualTableData.rows, yPosition);
+    
+    yPosition += 15;
+
+    // Check if we need a new page
+    if (yPosition > pageHeight - 100) {
+      doc.addPage();
+      yPosition = 20;
+    }
+
+    // UE Groups section
+    doc.setFillColor(248, 249, 250);
+    doc.rect(15, yPosition - 5, pageWidth - 30, 8, 'F');
+    
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(51, 51, 51);
+    doc.text('🎓 Moyennes par Unité d\'Enseignement', 20, yPosition);
+    yPosition += 15;
+
+    // UE groups table
+    const ueTableData = this.prepareUETableData();
+    yPosition = this.drawPDFTable(doc, ueTableData.headers, ueTableData.rows, yPosition);
+
+    // Summary section
+    if (yPosition > pageHeight - 60) {
+      doc.addPage();
+      yPosition = 20;
+    } else {
+      yPosition += 20;
+    }
+
+    // Summary box
+    doc.setFillColor(220, 248, 198);
+    doc.rect(15, yPosition - 5, pageWidth - 30, 40, 'F');
+    doc.setDrawColor(40, 167, 69);
+    doc.rect(15, yPosition - 5, pageWidth - 30, 40, 'S');
+    
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(33, 37, 41);
+    doc.text('📊 Résumé Général', 20, yPosition + 5);
+    
+    const generalAverage = this.currentData.find(m => m.isGeneral);
+    if (generalAverage) {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      const avgText = `Moyenne Générale: ${generalAverage.moyenne.toFixed(2).replace('.', ',')} / 20`;
+      const status = generalAverage.moyenne >= 10 ? '✅ Validé' : '❌ Non validé';
+      
+      if (generalAverage.moyenne >= 10) {
+        doc.setTextColor(40, 167, 69);
+      } else {
+        doc.setTextColor(220, 53, 69);
+      }
+      
+      doc.text(avgText, 20, yPosition + 18);
+      doc.text(`Statut: ${status}`, 20, yPosition + 28);
+    }
+
+    // Footer
+    doc.setFillColor(102, 126, 234);
+    doc.rect(0, pageHeight - 20, pageWidth, 20, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Généré par Calculator - Extension Chrome développée par Nasri Ayari', pageWidth / 2, pageHeight - 8, { align: 'center' });
+    
+    // Add page numbers
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setTextColor(108, 117, 125);
+      doc.setFontSize(8);
+      doc.text(`Page ${i} sur ${pageCount}`, pageWidth - 20, pageHeight - 25, { align: 'right' });
+    }
+  }
+
+  // Draw table in PDF with proper formatting
+  drawPDFTable(doc, headers, rows, startY) {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const tableWidth = pageWidth - 40;
+    const colWidth = tableWidth / headers.length;
+    let yPosition = startY;
+
+    // Table headers
+    doc.setFillColor(233, 236, 239);
+    doc.rect(20, yPosition, tableWidth, 8, 'F');
+    doc.setDrawColor(206, 212, 218);
+    doc.rect(20, yPosition, tableWidth, 8, 'S');
+    
+    doc.setTextColor(33, 37, 41);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    
+    headers.forEach((header, index) => {
+      const text = doc.splitTextToSize(header, colWidth - 4);
+      doc.text(text, 22 + (index * colWidth), yPosition + 5);
+    });
+    
+    yPosition += 8;
+
+    // Table rows
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    
+    rows.forEach((row, rowIndex) => {
+      // Check if we need a new page
+      if (yPosition > pageHeight - 40) {
+        doc.addPage();
+        yPosition = 20;
+        
+        // Redraw headers on new page
+        doc.setFillColor(233, 236, 239);
+        doc.rect(20, yPosition, tableWidth, 8, 'F');
+        doc.setTextColor(33, 37, 41);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        
+        headers.forEach((header, index) => {
+          const text = doc.splitTextToSize(header, colWidth - 4);
+          doc.text(text, 22 + (index * colWidth), yPosition + 5);
+        });
+        
+        yPosition += 8;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+      }
+      
+      // Alternate row colors
+      if (rowIndex % 2 === 0) {
+        doc.setFillColor(248, 249, 250);
+        doc.rect(20, yPosition, tableWidth, 6, 'F');
+      }
+      
+      row.forEach((cell, colIndex) => {
+        // Color coding for grades and status
+        if (headers[colIndex] === 'Moyenne' || headers[colIndex] === 'Statut') {
+          if (headers[colIndex] === 'Moyenne' && !isNaN(parseFloat(String(cell).replace(',', '.')))) {
+            const grade = parseFloat(String(cell).replace(',', '.'));
+            doc.setTextColor(grade >= 10 ? 40 : 220, grade >= 10 ? 167 : 53, grade >= 10 ? 69 : 69);
+          } else if (headers[colIndex] === 'Statut') {
+            doc.setTextColor(String(cell).includes('Validé') && !String(cell).includes('Non') ? 40 : 220, 
+                           String(cell).includes('Validé') && !String(cell).includes('Non') ? 167 : 53, 69);
+          }
+        } else {
+          doc.setTextColor(33, 37, 41);
+        }
+        
+        const text = doc.splitTextToSize(String(cell), colWidth - 4);
+        doc.text(text, 22 + (colIndex * colWidth), yPosition + 4);
+      });
+      
+      yPosition += 6;
+    });
+
+    return yPosition;
+  }
+
+  // Prepare individual table data for PDF
+  prepareIndividualTableData() {
+    const headers = ['Module', 'Enseignant', 'CC', 'TP', 'Examen', 'Crédits', 'Moyenne'];
+    const rows = [];
+    
+    this.currentData.forEach(module => {
+      if (!module.isGeneral) {
+        const row = [
+          module.designation,
+          module.enseignant || '-',
+          module.noteCC !== null ? module.noteCC.toString().replace('.', ',') : '-',
+          module.noteTP !== null ? module.noteTP.toString().replace('.', ',') : '-',
+          module.noteExam !== null ? module.noteExam.toString().replace('.', ',') : '-',
+          module.credits.toString(),
+          module.moyenne !== null ? module.moyenne.toFixed(2).replace('.', ',') : '-'
+        ];
+        
+        if (module.hasRattrapage) {
+          row[0] += ' (R)'; // Mark rattrapage modules
+        }
+        
+        rows.push(row);
+      }
+    });
+    
+    return { headers, rows };
+  }
+
+  // Prepare UE table data for PDF
+  prepareUETableData() {
+    const headers = ['Unité d\'Enseignement', 'Modules', 'Crédits', 'Moyenne', 'Statut'];
+    const rows = [];
+    
+    Object.values(this.groupedData).forEach(ue => {
+      if (!ue.isGeneral && ue.modules.length > 0) {
+        const modulesList = ue.modules.map(m => m.designation).join(', ');
+        const isProjetIntegration = this.isProjetIntegrationModule(ue.name) || 
+                                   ue.modules.some(m => this.isProjetIntegrationModule(m.designation));
+        const passingGrade = isProjetIntegration ? 10 : 8;
+        const status = ue.moyenne >= passingGrade ? 'Validé' : 'Non validé';
+        
+        rows.push([
+          ue.name,
+          modulesList,
+          ue.totalCredits.toString(),
+          ue.moyenne.toFixed(2).replace('.', ','),
+          status
+        ]);
+      }
+    });
+    
+    return { headers, rows };
   }
 
   // Generate print content
@@ -980,8 +1318,9 @@ class EspritGradeCalculator {
       const exam = module.noteExam !== null ? module.noteExam.toString().replace('.', ',') : '-';
       const moyenne = module.moyenne !== null ? module.moyenne.toFixed(2).replace('.', ',') : '-';
       
+      const passingGrade = this.isProjetIntegrationModule(module.designation) ? 10 : 8;
       const rowClass = module.isGeneral ? 'general-row' : 
-                      (module.moyenne !== null && module.moyenne >= 8 ? 'passing' : 'failing');
+                      (module.moyenne !== null && module.moyenne >= passingGrade ? 'passing' : 'failing');
       
       content += `
         <tr class="${rowClass}">
@@ -1015,9 +1354,12 @@ class EspritGradeCalculator {
     
     Object.values(this.groupedData).forEach(ue => {
       const moyenne = ue.moyenne.toFixed(2).replace('.', ',');
-      const status = ue.isGeneral ? '' : (ue.moyenne >= 8 ? 'Validé' : 'Non validé');
+      const isProjetIntegration = this.isProjetIntegrationModule(ue.name) || 
+                                 ue.modules.some(m => this.isProjetIntegrationModule(m.designation));
+      const passingGrade = isProjetIntegration ? 10 : 8;
+      const status = ue.isGeneral ? '' : (ue.moyenne >= passingGrade ? 'Validé' : 'Non validé');
       const rowClass = ue.isGeneral ? 'general-row' : 
-                      (ue.moyenne >= 8 ? 'passing' : 'failing');
+                      (ue.moyenne >= passingGrade ? 'passing' : 'failing');
       
       content += `
         <tr class="${rowClass}">
@@ -1053,19 +1395,299 @@ class EspritGradeCalculator {
     // Remove existing notifications
     const existingNotifications = document.querySelectorAll('.grade-notification');
     existingNotifications.forEach(notif => notif.remove());
-    
+
     const notification = document.createElement('div');
     notification.className = `grade-notification ${type}`;
     notification.textContent = message;
-    
+
     document.body.appendChild(notification);
-    
+
     // Auto-remove after 5 seconds
     setTimeout(() => {
       if (notification.parentNode) {
         notification.remove();
       }
     }, 5000);
+  }
+
+  // Extract unique module names from the grades table
+  extractModulesFromTable() {
+    const table = document.getElementById("ContentPlaceHolder1_GridView1");
+    if (!table) return [];
+
+    const modulesSet = new Set();
+    const rows = table.getElementsByTagName("tr");
+
+    for (let i = 1; i < rows.length; i++) {
+      const cells = rows[i].getElementsByTagName("td");
+      if (cells.length < 1) continue;
+      const moduleName = cells[0]?.textContent.trim();
+      if (moduleName) {
+        modulesSet.add(moduleName);
+      }
+    }
+
+    return Array.from(modulesSet);
+  }
+
+  // Drag and Drop Event Handlers for UE table grouping
+  handleDragStart(e) {
+    e.dataTransfer.setData('text/plain', e.target.dataset.ueName);
+    e.target.classList.add('dragging');
+    this.showNotification("Glissez sur une autre UE pour les fusionner", "info");
+  }
+
+  handleDragOver(e) {
+    e.preventDefault();
+    const targetRow = e.target.closest('tr');
+    if (targetRow && targetRow.classList.contains('ue-row')) {
+      targetRow.classList.add('drag-over');
+    }
+  }
+
+  handleDrop(e) {
+    e.preventDefault();
+    const draggedUEName = e.dataTransfer.getData('text/plain');
+    const targetRow = e.target.closest('tr');
+    const targetUEName = targetRow.dataset.ueName;
+    
+    // Remove drag-over class
+    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    
+    if (draggedUEName && targetUEName && draggedUEName !== targetUEName) {
+      this.mergeUEs(draggedUEName, targetUEName);
+    }
+  }
+
+  handleDragEnd(e) {
+    e.target.classList.remove('dragging');
+    // Remove all drag-over classes
+    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+  }
+
+  // Merge two UE groups
+  mergeUEs(sourceUEName, targetUEName) {
+    const sourceUE = this.groupedData[sourceUEName];
+    const targetUE = this.groupedData[targetUEName];
+    
+    if (!sourceUE || !targetUE || sourceUE.isGeneral || targetUE.isGeneral) {
+      this.showNotification("Impossible de fusionner ces UE", "error");
+      return;
+    }
+
+    // Create new merged UE name
+    const mergedName = `${targetUEName} + ${sourceUEName}`;
+    
+    // Merge modules and credits
+    const mergedModules = [...targetUE.modules, ...sourceUE.modules];
+    const mergedCredits = targetUE.totalCredits + sourceUE.totalCredits;
+    const mergedWeightedScore = targetUE.weightedScore + sourceUE.weightedScore;
+    
+    // Calculate new average
+    const validModules = mergedModules.filter(m => m.moyenne !== null);
+    const validCredits = validModules.reduce((sum, m) => sum + m.credits, 0);
+    const newAverage = validCredits > 0 ? mergedWeightedScore / validCredits : 0;
+    
+    // Create merged UE
+    this.groupedData[mergedName] = {
+      name: mergedName,
+      modules: mergedModules,
+      totalCredits: mergedCredits,
+      weightedScore: mergedWeightedScore,
+      moyenne: newAverage,
+      isGeneral: false
+    };
+    
+    // Remove original UEs
+    delete this.groupedData[sourceUEName];
+    delete this.groupedData[targetUEName];
+    
+    // Update UE groups configuration
+    this.ueGroups[mergedName] = {
+      modules: mergedModules.map(m => ({ name: m.designation, credits: m.credits })),
+      totalCredits: mergedCredits
+    };
+    
+    // Remove old configurations
+    delete this.ueGroups[sourceUEName];
+    delete this.ueGroups[targetUEName];
+    
+    // Refresh the display
+    this.refreshGroupedTable();
+    
+    this.showNotification(`UE fusionnées: ${mergedName}`, "success");
+  }
+
+  // Split UE back into individual modules
+  splitUE(ueName) {
+    const ue = this.groupedData[ueName];
+    if (!ue || ue.isGeneral) return;
+    
+    // Create individual groups for each module
+    ue.modules.forEach(module => {
+      const individualName = module.designation;
+      this.groupedData[individualName] = {
+        name: individualName,
+        modules: [module],
+        totalCredits: module.credits,
+        weightedScore: module.moyenne !== null ? module.moyenne * module.credits : 0,
+        moyenne: module.moyenne || 0,
+        isGeneral: false
+      };
+    });
+    
+    // Remove the merged UE
+    delete this.groupedData[ueName];
+    delete this.ueGroups[ueName];
+    
+    // Refresh the display
+    this.refreshGroupedTable();
+    
+    this.showNotification(`UE séparée: ${ueName}`, "info");
+  }
+
+  // Refresh only the grouped table
+  refreshGroupedTable() {
+    const existingGroupedTable = document.querySelector('.grouped-table');
+    if (existingGroupedTable) {
+      const newGroupedTable = this.createGroupedTable();
+      existingGroupedTable.parentNode.replaceChild(newGroupedTable, existingGroupedTable);
+    }
+  }
+
+  // Refresh both individual and grouped tables (used for major changes)
+  refreshBothTables() {
+    // Refresh individual table
+    const existingIndividualTable = document.querySelector('.individual-table');
+    if (existingIndividualTable) {
+      const newIndividualTable = this.createIndividualTable();
+      existingIndividualTable.parentNode.replaceChild(newIndividualTable, existingIndividualTable);
+    }
+    
+    // Refresh grouped table
+    this.refreshGroupedTable();
+  }
+
+  // Check if a module is a Projet d'Intégration module
+  isProjetIntegrationModule(moduleName) {
+    if (!moduleName) return false;
+    
+    const lowerName = moduleName.toLowerCase();
+    return lowerName.includes('projet d\'intégration') || 
+           lowerName.includes('projet d\'intégration') ||
+           lowerName.includes('projet integration') ||
+           lowerName.includes('pi ') ||
+           lowerName.includes(' pi') ||
+           lowerName === 'pi' ||
+           lowerName.includes('p.i') ||
+           (lowerName.includes('projet') && lowerName.includes('intégration'));
+  }
+
+  // Handle credits change in individual table
+  handleCreditsChange(e) {
+    const input = e.target;
+    const index = parseInt(input.dataset.index);
+    const newCredits = parseInt(input.value) || 1;
+    
+    // Clamp credits between 1-20
+    const clampedCredits = Math.max(1, Math.min(20, newCredits));
+    if (newCredits !== clampedCredits) {
+      input.value = clampedCredits;
+    }
+    
+    // Update the module data
+    if (this.currentData[index] && !this.currentData[index].isGeneral) {
+      this.currentData[index].credits = clampedCredits;
+      
+      // Recalculate general average with updated credits
+      this.recalculateGeneralAverage();
+      
+      // Recalculate grouped data to reflect credit changes
+      this.groupModulesByUE();
+      
+      // Update both tables with new values
+      this.updateTablesRealTime();
+      
+      this.showNotification(`Crédits mis à jour: ${this.currentData[index].designation} (${clampedCredits} crédits)`, "info");
+    }
+  }
+
+  // Recalculate general average when credits change
+  recalculateGeneralAverage() {
+    let totalWeightedScore = 0;
+    let totalCredits = 0;
+
+    this.currentData.forEach(module => {
+      if (!module.isGeneral && module.moyenne !== null) {
+        totalWeightedScore += module.moyenne * module.credits;
+        totalCredits += module.credits;
+      }
+    });
+
+    this.updateGeneralAverage(totalWeightedScore, totalCredits);
+  }
+
+  // Update tables in real-time without full refresh
+  updateTablesRealTime() {
+    // Update individual table general average row
+    const individualTable = document.querySelector('.individual-table table');
+    if (individualTable) {
+      const generalRow = Array.from(individualTable.querySelectorAll('tr')).find(row => 
+        row.querySelector('.module-name')?.textContent?.includes('Moyenne Générale Individuelle')
+      );
+      
+      if (generalRow) {
+        const generalModule = this.currentData.find(m => m.isGeneral);
+        if (generalModule) {
+          const creditsCell = generalRow.children[5]; // Credits column
+          const moyenneCell = generalRow.children[6]; // Average column
+          
+          creditsCell.textContent = generalModule.credits;
+          moyenneCell.textContent = generalModule.moyenne.toFixed(2).replace('.', ',');
+        }
+      }
+    }
+
+    // Update grouped table credits and averages
+    const groupedTable = document.querySelector('.grouped-table table tbody');
+    if (groupedTable) {
+      const rows = groupedTable.querySelectorAll('tr');
+      const groupedData = Object.values(this.groupedData);
+      
+      rows.forEach((row, index) => {
+        if (groupedData[index]) {
+          const creditsCell = row.children[2]; // Credits column
+          const moyenneCell = row.children[3]; // Average column
+          const statusCell = row.children[4]; // Status column
+          
+          if (creditsCell) creditsCell.textContent = groupedData[index].totalCredits;
+          if (moyenneCell) moyenneCell.textContent = groupedData[index].moyenne.toFixed(2).replace('.', ',');
+          
+          if (statusCell && !groupedData[index].isGeneral) {
+            const isProjetIntegration = this.isProjetIntegrationModule(groupedData[index].name) || 
+                                       groupedData[index].modules.some(m => this.isProjetIntegrationModule(m.designation));
+            const passingGrade = isProjetIntegration ? 10 : 8;
+            statusCell.textContent = groupedData[index].moyenne >= passingGrade ? 'Validé' : 'Non validé';
+            
+            row.classList.remove('passing', 'failing');
+            row.classList.add(groupedData[index].moyenne >= passingGrade ? 'passing' : 'failing');
+          }
+        }
+      });
+    }
+  }
+
+  // Validate credits input
+  validateCreditsInput(e) {
+    const input = e.target;
+    const value = parseInt(input.value);
+    
+    if (isNaN(value) || value < 1 || value > 20) {
+      input.classList.add('invalid');
+      this.showNotification("Crédits doivent être entre 1 et 20", "warning");
+    } else {
+      input.classList.remove('invalid');
+    }
   }
 }
 
